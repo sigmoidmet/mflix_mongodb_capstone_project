@@ -81,6 +81,9 @@ public class CommentDao extends AbstractMFlixDao {
      * returns the resulting Comment object.
      */
     public Comment addComment(Comment comment) {
+        log.info("Adding a new comment with id {} for user {} and movie {}",
+                 comment.getId(), comment.getEmail(), comment.getMovieId());
+
         if (Strings.isBlank(comment.getId())) {
             throw new IncorrectDaoOperation("Comment has to have an id.");
         }
@@ -108,6 +111,8 @@ public class CommentDao extends AbstractMFlixDao {
      * @return true if successfully updates the comment text.
      */
     public boolean updateComment(String commentId, String text, String email) {
+        log.info("Updating comment with id {} by user {}", commentId, email);
+
         try {
             UpdateResult updateResult = commentCollection.updateOne(
                     and(eq(CommentConstants.EMAIL, email),
@@ -130,6 +135,8 @@ public class CommentDao extends AbstractMFlixDao {
      * @return true if successful deletes the comment.
      */
     public boolean deleteComment(String commentId, String email) {
+        log.info("Deleting comment with id {} by user {}", commentId, email);
+
         try {
             DeleteResult deleteResult = commentCollection.deleteOne(combine(eq(CommentConstants.EMAIL, email),
                                                                             eq("_id", new ObjectId(commentId))));

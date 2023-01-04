@@ -1,6 +1,7 @@
 package mflix.api.services;
 
 import mflix.api.daos.CommentDao;
+import mflix.api.daos.IncorrectDaoOperation;
 import mflix.api.daos.MovieDao;
 import mflix.api.daos.MovieDocumentMapper;
 import mflix.api.daos.UserDao;
@@ -10,6 +11,8 @@ import mflix.api.models.Movie;
 import mflix.api.models.User;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,8 @@ import java.util.stream.Collectors;
 @Service
 @Configuration
 public class MoviesService {
+
+    private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     @Autowired
     private MovieDao movieDao;
@@ -250,7 +255,7 @@ public class MoviesService {
         updateComment.setId(commentBody.get("comment_id"));
         updateComment.setDate(new Date());
         updateComment.setText(commentBody.get("updated_comment"));
-        if (!commentDao.updateComment(updateComment.getId(), updateComment.getText(), email)) {
+        if (!tryUpdateComment(email, updateComment)) {
             // check if the email matches the current user
             Comment currentComment = commentDao.getComment(updateComment.getId());
             if (currentComment == null) {
@@ -268,6 +273,16 @@ public class MoviesService {
         Movie movie = MovieDocumentMapper.mapToMovie(movieDao.getMovie(updateComment.getMovieId()));
         results.put("comments", movie.getComments());
         return true;
+    }
+
+    private boolean tryUpdateComment(String email, Comment updateComment) {
+        try {
+            return commentDao.updateComment(updateComment.getId(), updateComment.getText(), email);
+        } catch (IncorrectDaoOperation e) {
+            log.error(String.format("Couldn't update comment with id %s for user %s", email, updateComment.getId()),
+                      e);
+            return false;
+        }
     }
 
     /**
@@ -296,7 +311,7 @@ public class MoviesService {
         newComment.setText(text);
         newComment.setName(user.getName());
 
-        if (commentDao.addComment(newComment) == null) {
+        if (addComment(newComment) == null) {
             results.put(
                     "error", MessageFormat.format("not able to add comment to movie `{0}` ", movieId));
             return false;
@@ -305,6 +320,15 @@ public class MoviesService {
         Movie movie = MovieDocumentMapper.mapToMovie(movieDao.getMovie(movieId));
         results.put("comments", movie.getComments());
         return true;
+    }
+
+    private Comment addComment(Comment newComment) {
+        try {
+            return commentDao.addComment(newComment);
+        } catch (IncorrectDaoOperation e) {
+            log.error("Some error's occurred during adding a comment to movie" + newComment.getMovieId(), e);
+            return null;
+        }
     }
 
     /**
@@ -319,7 +343,7 @@ public class MoviesService {
     public boolean deleteMovieComment(
             String movieId, String email, String commentId, Map<String, Object> results) {
 
-        if (!commentDao.deleteComment(commentId, email)) {
+        if (!tryDeleteComment(email, commentId)) {
             results.put(
                     "error",
                     MessageFormat.format("user `{0}` cannot delete comment `{1}`", email, commentId));
@@ -329,6 +353,15 @@ public class MoviesService {
         Movie movie = MovieDocumentMapper.mapToMovie(movieDao.getMovie(movieId));
         results.put("comments", movie.getComments());
         return true;
+    }
+
+    private boolean tryDeleteComment(String email, String commentId) {
+        try {
+            return commentDao.deleteComment(commentId, email);
+        } catch (IncorrectDaoOperation e) {
+            log.error(String.format("Couldn't delete comment with id %s for user %s", commentId, email), e);
+            return false;
+        }
     }
 
     /**
