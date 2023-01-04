@@ -1,5 +1,6 @@
 package mflix.api.daos;
 
+import com.mongodb.ErrorCategory;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.MongoWriteException;
 import com.mongodb.WriteConcern;
@@ -23,6 +24,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.set;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
@@ -62,10 +64,17 @@ public class UserDao extends AbstractMFlixDao {
         try {
             usersCollection.withWriteConcern(WriteConcern.MAJORITY).insertOne(user);
         } catch (MongoWriteException e) {
-            throw new IncorrectDaoOperation("The user is already exists");
+            rethrowWriteException(e);
         }
 
         return true;
+    }
+
+    private static void rethrowWriteException(MongoWriteException e) {
+        if (ErrorCategory.DUPLICATE_KEY.equals(e.getError().getCategory())) {
+            throw new IncorrectDaoOperation("The user is already exists");
+        }
+        throw new IncorrectDaoOperation(e);
     }
 
     /**
@@ -77,6 +86,12 @@ public class UserDao extends AbstractMFlixDao {
      */
     public boolean createUserSession(String userId, String jwt) {
         log.info("Creating a session for user with id {}", userId);
+
+        if (sessionsCollection.countDocuments(
+                and(eq(SessionConstants.USER_ID, userId), eq(SessionConstants.JWT, jwt))
+        ) != 0) {
+            throw new IncorrectDaoOperation("User " + userId + " already has an associated session with the same JWT");
+        }
 
         UpdateResult updateResult = writeToMongoDBSafely(
                 () -> sessionsCollection.updateOne(
@@ -157,7 +172,8 @@ public class UserDao extends AbstractMFlixDao {
                 set(UserConstants.PREFERENCES, userPreferences)
         ));
 
-        return updateResult.wasAcknowledged();
+        // If we didn't change any document then pre-implemented UserService will check for user existence
+        return updateResult.getModifiedCount() > 0L;
     }
 
     private <T> T writeToMongoDBSafely(Supplier<T> writeOperation) {
