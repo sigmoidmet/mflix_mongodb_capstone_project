@@ -57,6 +57,8 @@ public class UserDao extends AbstractMFlixDao {
      * @return True if successful, throw IncorrectDaoOperation otherwise
      */
     public boolean addUser(User user) {
+        log.info("Creating a user with email {}", user.getEmail());
+
         try {
             usersCollection.withWriteConcern(WriteConcern.MAJORITY).insertOne(user);
         } catch (MongoWriteException e) {
@@ -74,6 +76,8 @@ public class UserDao extends AbstractMFlixDao {
      * @return true if successful
      */
     public boolean createUserSession(String userId, String jwt) {
+        log.info("Creating a session for user with id {}", userId);
+
         UpdateResult updateResult = writeToMongoDBSafely(
                 () -> sessionsCollection.updateOne(
                         eq(SessionConstants.USER_ID, userId),
@@ -105,6 +109,8 @@ public class UserDao extends AbstractMFlixDao {
     }
 
     public boolean deleteUserSessions(String userId) {
+        log.info("Deleting sessions for user with id {}", userId);
+
         DeleteResult deleteResult = sessionsCollection.deleteMany(eq(SessionConstants.USER_ID, userId));
         return deleteResult.wasAcknowledged();
     }
@@ -116,6 +122,8 @@ public class UserDao extends AbstractMFlixDao {
      * @return true if user successfully removed
      */
     public boolean deleteUser(String email) {
+        log.info("Deleting a user with email {}", email);
+
         DeleteResult userDeleteResult =
                 writeToMongoDBSafely(() -> usersCollection.deleteOne(eq(UserConstants.EMAIL, email)));
 
@@ -138,6 +146,8 @@ public class UserDao extends AbstractMFlixDao {
      * @return User object that just been updated.
      */
     public boolean updateUserPreferences(String email, Map<String, ?> userPreferences) {
+        log.info("Updating user preferences for {}", email);
+
         if (userPreferences == null) {
             throw new IncorrectDaoOperation("userPreferences can't be null");
         }

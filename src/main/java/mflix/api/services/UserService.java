@@ -5,6 +5,8 @@ import mflix.api.daos.UserDao;
 import mflix.api.models.User;
 import mflix.api.models.UserPrincipal;
 import mflix.api.models.UserRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +23,8 @@ import java.util.Map;
 @Service
 @Configuration
 public class UserService implements UserDetailsService {
+
+    private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -78,6 +82,7 @@ public class UserService implements UserDetailsService {
         try {
             return userDao.addUser(user) ? user : null;
         } catch (IncorrectDaoOperation ex) {
+            log.error("Couldn't create a user with email " + user.getEmail(), ex);
             errors.put("msg", ex.getMessage());
         }
         return null;
@@ -144,7 +149,12 @@ public class UserService implements UserDetailsService {
             return false;
         }
 
-        return userDao.deleteUser(email);
+        try {
+            return userDao.deleteUser(email);
+        } catch (IncorrectDaoOperation e) {
+            log.error("Couldn't delete user with email " + email, e);
+            return false;
+        }
     }
 
     /**
@@ -160,7 +170,7 @@ public class UserService implements UserDetailsService {
 
         Map<String, String> preferences =
                 (Map<String, String>) userPreferences.get("preferences");
-        if (userDao.updateUserPreferences(email, preferences)) {
+        if (tryUpdateUserPreferences(email, preferences)) {
             User user = userDao.getUser(email);
             if (user == null) {
 
@@ -170,6 +180,15 @@ public class UserService implements UserDetailsService {
             return true;
         }
         return false;
+    }
+
+    private boolean tryUpdateUserPreferences(String email, Map<String, String> preferences) {
+        try {
+            return userDao.updateUserPreferences(email, preferences);
+        } catch (IncorrectDaoOperation e) {
+            log.error("Couldn't update user preferences for " + email, e);
+            return false;
+        }
     }
 
     @Override
